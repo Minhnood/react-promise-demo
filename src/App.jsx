@@ -101,7 +101,7 @@ export default function App({ userId, categoryId }) {
   }, [count]);
 
   // VÍ DỤ 5: useCallback VỚI MẢNG PHỤ THUỘC
-  // Giải thích: Giữ nguyên reference của hàm trừ khi 'userId' thay đổi. Rất tốt khi truyền hàm xuống component con.
+  // Giải thích: Giữ nguyên reference của hàm trừ khi 'userId' thay đổi.
   const handleUserClick = useCallback(() => {
     console.log(`User ${userId} clicked. Calculated value: ${expensiveCalculation}`);
   }, [userId, expensiveCalculation]);
