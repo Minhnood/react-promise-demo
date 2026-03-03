@@ -1,122 +1,136 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import './App.css';
 
-// ============================================================================
-// PHẦN 1: CÁC PHƯƠNG THỨC CỦA PROMISE (PROMISE COMBINATORS)
-// ============================================================================
+/* ---------------------------------------------------------
+  - Promise: Có 3 trạng thái: 
+    1. Pending : đang chờ
+    2. Fulfilled : thành công
+    3. Rejected : lỗi
+  ---------------------------------------------------------
+*/
 
-// Các hàm giả API chạy Promise
-const fetchUser = () => Promise.resolve("Dữ liệu User");
-const fetchCart = () => Promise.resolve("Dữ liệu Giỏ hàng");
-const fetchError = () => Promise.reject("Lỗi máy chủ!");
-
-const uploadFile1 = () => Promise.resolve("File 1 OK");
-const uploadFile2 = () => Promise.reject("File 2 Lỗi dung lượng");
-
-const fastAPI = () => new Promise(res => setTimeout(() => res("API Nhanh (1s)"), 1000));
-const slowAPI = () => new Promise(res => setTimeout(() => res("API Chậm (3s)"), 3000));
-const timeout = () => new Promise((_, rej) => setTimeout(() => rej("Timeout (2s)"), 2000));
-
-const server1Down = () => Promise.reject("Server 1 sập");
-const server2Fast = () => new Promise(res => setTimeout(() => res("Server 2 (1s)"), 1000));
-
-const runPromiseExamples = () => {
-  // 1. Promise.all: Đợi TẤT CẢ thành công. Nếu MỘT cái lỗi, dừng và báo lỗi ngay.
-  Promise.all([fetchUser(), fetchCart()])
-    .then(res => console.log("Promise.all (Thành công):", res)) // ["Dữ liệu User", "Dữ liệu Giỏ hàng"]
-    .catch(err => console.error("Promise.all (Lỗi):", err));
-
-  Promise.all([fetchUser(), fetchError()])
-    .then(res => console.log("Không chạy vào đây"))
-    .catch(err => console.error("Promise.all (Bị ngắt do lỗi):", err)); // "Lỗi máy chủ!"
-
-  // 2. Promise.allSettled: Đợi TẤT CẢ chạy xong, bất kể thành công hay thất bại.
-  Promise.allSettled([uploadFile1(), uploadFile2()])
-    .then(results => {
-      console.log("Promise.allSettled (Kết quả chi tiết):");
-      // Trả về mảng object: [{status: 'fulfilled', value: ...}, {status: 'rejected', reason: ...}]
-      results.forEach((item, index) => {
-        if (item.status === "fulfilled") console.log(`- File ${index + 1}:`, item.value);
-        else console.log(`- File ${index + 1} Lỗi:`, item.reason);
-      });
-    });
-
-  // 3. Promise.race: Lấy kết quả của Promise xong ĐẦU TIÊN (có thể là thành công hoặc lỗi).
-  Promise.race([slowAPI(), timeout()])
-    .then(res => console.log("Không chạy vào đây"))
-    .catch(err => console.error("Promise.race (Bị Timeout):", err)); // "Timeout (2s)"
-
-  Promise.race([fastAPI(), timeout()])
-    .then(res => console.log("Promise.race (Nhanh hơn Timeout):", res)) // "API Nhanh (1s)"
-    .catch(err => console.error("Không chạy vào đây"));
-
-  // 4. Promise.any: Lấy Promise THÀNH CÔNG đầu tiên. Chỉ báo lỗi khi TẤT CẢ đều lỗi.
-  Promise.any([server1Down(), server2Fast(), slowAPI()])
-    .then(res => console.log("Promise.any (Lấy server thành công nhanh nhất):", res)) // "Server 2 (1s)"
-    .catch(err => console.error("Chỉ chạy khi tất cả đều sập", err));
+// Fake API lấy Profile - trả về 1 Promise sau 1.5s
+const fetchProfile = () => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      // Gọi resolve tức là chuyển Promise sang Fulfilled
+      resolve({ ten: "Nguyễn Văn Tèo", vaiTro: "hehehehe", avatar: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTHr-ao2cH2zg2N8Ldj8mcYjP7-dNFsP2bY-g&s" });
+      // comment dòng trên và bật dòng dưới để test lỗi
+      reject("Server sập rồi!");
+    }, 1500);
+  });
 };
 
-
-// ============================================================================
-// PHẦN 2: REACT HOOK DEPENDENCIES (MẢNG PHỤ THUỘC)
-// ============================================================================
-
-export default function App({ userId, categoryId }) {
-  const [count, setCount] = useState(0);
-  const [data, setData] = useState(null);
-
-  // VÍ DỤ 1: KHÔNG CÓ MẢNG PHỤ THUỘC
-  // Giải thích: Chạy lại sau MỖI LẦN component render. Dễ gây infinite loop nếu có setState bên trong.
-  useEffect(() => {
-    console.log("1. Component vừa render hoặc re-render");
+// Fake API lấy Task - trả về 1 Promise sau 2s
+const fetchTasks = () => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve([
+        { id: 1, ten: "Hoàn thiện báo cáo tháng", hoanThanh: true },
+        { id: 2, ten: "Nghiên cứu React Hooks", hoanThanh: false },
+        { id: 3, ten: "Họp với team Design", hoanThanh: false },
+      ]);
+    }, 2000);
   });
+};
 
-  // VÍ DỤ 2: MẢNG PHỤ THUỘC RỖNG []
-  // Giải thích: Chỉ chạy ĐÚNG 1 LẦN khi component được mount (xuất hiện trên DOM).
+export default function App() {
+  const [duLieu, setDuLieu] = useState({ hoSo: null, congViec: [] });
+  const [dangTai, setDangTai] = useState(true);
+  const [loi, setLoi] = useState(null);
+
+  // Dùng state này làm trigger để ép component render lại
+  const [lanLamMoi, setLanLamMoi] = useState(0);
+
+  /* ---------------------------------------------------------
+   Vòng đời của một component trong React
+    - Mounting: Component lần đầu xuất hiện trên màn hình.
+    - Updating: Component vẽ lại do state hoặc props thay đổi.
+    - Unmounting: Component bị xóa khỏi màn hình.
+    ---------------------------------------------------------
+  */
+
+  // Dependency array [lanLamMoi] nghĩa là: 
+  // Chạy lần đầu lúc Mouting, và chạy lại (Updating) mỗi khi bấm nút Làm mới.
   useEffect(() => {
-    console.log("2. Component Mount: Chạy Promise Examples và thiết lập dữ liệu ban đầu");
-    runPromiseExamples();
-    
-    const timer = setInterval(() => console.log('Tick...'), 5000);
-    
-    // Cleanup function: Chạy khi component unmount
-    return () => clearInterval(timer);
-  }, []); 
+    // NOTE QUAN TRỌNG: Biến cờ này để fix lỗi memory leak
+    // Lỡ đang call API mà user tắt trang -> component Unmount -> ko được set state nữa!
+    let daHuy = false;
 
-  // VÍ DỤ 3: MẢNG CÓ BIẾN PHỤ THUỘC [userId, categoryId]
-  // Giải thích: Chỉ chạy lại khi 'userId' HOẶC 'categoryId' thay đổi.
-  useEffect(() => {
-    if (!userId) return;
-    
-    console.log(`3. Đang gọi API lấy dữ liệu cho User ${userId}, Category ${categoryId}`);
-    // Giả lập API call
-    setData({ user: userId, cat: categoryId, info: "Dữ liệu mới" });
-    
-  }, [userId, categoryId]); // <-- Mảng phụ thuộc
+    // Hàm bất đồng bộ (async): Viết code nhìn như tuần tự từ trên xuống, ko bị Callback Hell
+    const taiDuLieu = async () => {
+      setDangTai(true);
+      setLoi(null);
 
-  // VÍ DỤ 4: useMemo VỚI MẢNG PHỤ THUỘC
-  // Giải thích: Lưu lại kết quả tính toán. Chỉ tính lại khi biến 'count' thay đổi.
-  const expensiveCalculation = useMemo(() => {
-    console.log("4. Đang tính toán dữ liệu nặng dựa trên count...");
-    return count * 1000;
-  }, [count]);
+      try {
+        //PROMISE.ALL
+        // Thay vì đợi 1.5s lấy Profile, xong đợi tiếp 2s lấy Task (tổng 3.5s)
+        // Dùng Promise.all quăng 2 cục chạy song song -> Tổng time chỉ tốn 2s (chờ thằng lâu nhất)
+        const [ketQuaHoSo, ketQuaCongViec] = await Promise.all([
+          fetchProfile(),
+          fetchTasks()
+        ]);
 
-  // VÍ DỤ 5: useCallback VỚI MẢNG PHỤ THUỘC
-  // Giải thích: Giữ nguyên reference của hàm trừ khi 'userId' thay đổi.
-  const handleUserClick = useCallback(() => {
-    console.log(`User ${userId} clicked. Calculated value: ${expensiveCalculation}`);
-  }, [userId, expensiveCalculation]);
+        // await có nghĩa là "chờ code ở đây lấy xong data đi rồi mới chạy xuống dòng dưới"
+        if (!daHuy) {
+          setDuLieu({ hoSo: ketQuaHoSo, congViec: ketQuaCongViec });
+        }
+      } catch (err) {
+        // Rơi vào đây nếu có bất kỳ 1 Promise nào bị Rejected
+        console.error("Toang rồi đại vương ơi:", err);
+        if (!daHuy) setLoi("Lỗi tải dữ liệu, coi lại mạng internet xem!");
+      } finally {
+        // Thành công hay thất bại thì cũng phải tắt cục loading xoay xoay
+        if (!daHuy) setDangTai(false);
+      }
+    };
 
+    // Gọi hàm thực thi
+    taiDuLieu();
+
+    // Cleanup function: Tương đương giai đoạn UNMOUNTING
+    // React sẽ tự gọi cục này trước khi chạy effect mới, hoặc khi component bị hủy
+    return () => {
+      daHuy = true;
+    };
+  }, [lanLamMoi]);
+
+  // UI Render
   return (
-    <div style={{ padding: 20 }}>
-      <h2>React & Promise Demo</h2>
-      <p>Count: {count} (Calculation: {expensiveCalculation})</p>
-      <button onClick={() => setCount(c => c + 1)}>Tăng Count (Kích hoạt useMemo)</button>
-      <button onClick={handleUserClick}>In thông tin User</button>
-      
-      <div style={{ marginTop: 20 }}>
-        <strong>Dữ liệu API:</strong>
-        <pre>{JSON.stringify(data, null, 2)}</pre>
-      </div>
+    <div className="container">
+      <header className="header">
+        <h1>Bảng Điều Khiển</h1>
+        {/* Nút này làm đổi state -> Trigger Lifecycle Updating */}
+        <button onClick={() => setLanLamMoi(c => c + 1)} disabled={dangTai}>
+          {dangTai ? "Đang tải..." : "Làm mới dữ liệu"}
+        </button>
+      </header>
+
+      {loi && <div className="error-box">{loi}</div>}
+
+      {dangTai ? (
+        <div className="loading">Đang lấy data, ráng đợi tí...</div>
+      ) : (
+        <div className="dashboard">
+          <div className="card profile-card">
+            {/* <div className="avatar">{duLieu.hoSo?.avatar}</div> */}
+            <img src={duLieu.hoSo?.avatar} alt="" />
+            <h2>{duLieu.hoSo?.ten}</h2>
+            <p className="role">{duLieu.hoSo?.vaiTro}</p>
+          </div>
+
+          <div className="card tasks-card">
+            <h3>Nhiệm vụ hôm nay</h3>
+            <ul className="task-list">
+              {duLieu.congViec.map(task => (
+                <li key={task.id} className={task.hoanThanh ? "done" : "pending"}>
+                  {task.ten}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
