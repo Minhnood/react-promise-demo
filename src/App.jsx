@@ -50,7 +50,7 @@ export default function App() {
     ---------------------------------------------------------
   */
 
-  // Dependency array [lanLamMoi] nghĩa là: 
+  // Dependency array nghĩa là: 
   // Chạy lần đầu lúc Mouting, và chạy lại (Updating) mỗi khi bấm nút Làm mới.
   useEffect(() => {
     // NOTE QUAN TRỌNG: Biến cờ này để fix lỗi memory leak
